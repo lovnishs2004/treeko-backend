@@ -1,3 +1,4 @@
+require("dotenv").config(); 
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -13,16 +14,13 @@ app.use(express.json());
 // ===========================
 // MongoDB Atlas Connection
 // ===========================
-const uri = "mongodb://singlalovnish073_db_user:36y8eStLtanqUgKK@ac-ipxkvtx-shard-00-00.xp2d6xl.mongodb.net:27017,ac-ipxkvtx-shard-00-01.xp2d6xl.mongodb.net:27017,ac-ipxkvtx-shard-00-02.xp2d6xl.mongodb.net:27017/aa?ssl=true&replicaSet=atlas-cwep1c-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster0";
-
-mongoose
-  .connect(uri)
-  .then(() => {
-    console.log("✅ MongoDB Atlas Connected");
-  })
-  .catch((err) => {
-    console.log("❌ MongoDB Connection Error:", err);
-  });
+mongoose.connect(process.env.MONGO_URI)
+.then(() => {
+    console.log("✅ MongoDB Connected");
+})
+.catch((err) => {
+    console.log(err);
+});
 
 // ===========================
 // Models
@@ -222,8 +220,8 @@ app.use("/api/group-messages", groupMessageRoutes);
 // ===========================
 // Start Server
 // ===========================
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on ${PORT}`);
 });

@@ -1,50 +1,86 @@
-const express =require("express");
-const app = express();
+const express = require("express");
 const mongoose = require("mongoose");
-const cors=require("cors");
+const cors = require("cors");
+
+const app = express();
+
+// ===========================
+// Middleware
+// ===========================
 app.use(cors());
-
-mongoose.connect("mongodb://localhost:27017/aa")
-.then(() => console.log("MongoDB Connected"))
-.catch((err) => console.log(err));
-
-const User =require("./set1")
-app.get("/", (req, res) => {
-  res.send("Server + MongoDB Connected");
-});
-
-
 app.use(express.json());
-app.post("/signup", async (req, res) => {
-  try {
-  const ff = new User({
-    name: req.body.name,
-    email: req.body.email,
-    password: req.body.password,
-    contactNumber: req.body.contactNumber || "",
-    linkedin: req.body.linkedin || "",
-    course: req.body.course || "",
-    bio: req.body.bio || "",
-    photo: req.body.photo || "",
-    skill: req.body.skill || ""
+
+// ===========================
+// MongoDB Atlas Connection
+// ===========================
+const uri = "mongodb://singlalovnish073_db_user:36y8eStLtanqUgKK@ac-ipxkvtx-shard-00-00.xp2d6xl.mongodb.net:27017,ac-ipxkvtx-shard-00-01.xp2d6xl.mongodb.net:27017,ac-ipxkvtx-shard-00-02.xp2d6xl.mongodb.net:27017/aa?ssl=true&replicaSet=atlas-cwep1c-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster0";
+
+mongoose
+  .connect(uri)
+  .then(() => {
+    console.log("✅ MongoDB Atlas Connected");
+  })
+  .catch((err) => {
+    console.log("❌ MongoDB Connection Error:", err);
   });
 
-    const existingUser = await User.findOne({ email: req.body.email });
+// ===========================
+// Models
+// ===========================
+const User = require("./set1");
+
+// ===========================
+// Home Route
+// ===========================
+app.get("/", (req, res) => {
+  res.send("Server + MongoDB Atlas Connected");
+});
+
+// ===========================
+// Signup
+// ===========================
+app.post("/signup", async (req, res) => {
+  try {
+    const existingUser = await User.findOne({
+      email: req.body.email,
+    });
+
     if (existingUser) {
-      return res.status(400).json({ message: "Email already exists" });
+      return res.status(400).json({
+        message: "Email already exists",
+      });
     }
 
-    const data = await ff.save();
+    const user = new User({
+      name: req.body.name,
+      email: req.body.email,
+      password: req.body.password,
+      contactNumber: req.body.contactNumber || "",
+      linkedin: req.body.linkedin || "",
+      course: req.body.course || "",
+      bio: req.body.bio || "",
+      photo: req.body.photo || "",
+      skill: req.body.skill || "",
+    });
+
+    const data = await user.save();
+
     res.status(201).json({
-      message: "User added",
-      data: data
+      message: "User added successfully",
+      data,
     });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "Could not create user" });
+
+    res.status(500).json({
+      message: "Could not create user",
+    });
   }
 });
 
+// ===========================
+// Login
+// ===========================
 app.post("/login", async (req, res) => {
   try {
     const user = await User.findOne({
@@ -52,37 +88,53 @@ app.post("/login", async (req, res) => {
       password: req.body.password,
     });
 
-    if (user) {
-      res.json({
-        message: "Login successful",
-        user: user   // ✅ send full user
+    if (!user) {
+      return res.status(401).json({
+        message: "Invalid email or password",
       });
-    } else {
-      res.json({ message: "Invalid email or password" });
     }
 
+    res.json({
+      message: "Login successful",
+      user,
+    });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "Server error" });
+
+    res.status(500).json({
+      message: "Server error",
+    });
   }
 });
 
-// GET PROFILE
+// ===========================
+// Get Profile
+// ===========================
 app.get("/profile/:email", async (req, res) => {
   try {
-    const user = await User.findOne({ email: req.params.email });
+    const user = await User.findOne({
+      email: req.params.email,
+    });
 
     if (!user) {
-      return res.json({ message: "User not found" });
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
     res.json(user);
-
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.log(error);
+
+    res.status(500).json({
+      message: "Server error",
+    });
   }
 });
 
+// ===========================
+// Update Profile
+// ===========================
 app.put("/profile/:email", async (req, res) => {
   try {
     const updates = {
@@ -90,36 +142,67 @@ app.put("/profile/:email", async (req, res) => {
       contactNumber: req.body.contactNumber || "",
       linkedin: req.body.linkedin || "",
       course: req.body.course || "",
-      bio: req.body.bio || ""
+      bio: req.body.bio || "",
+      skill: req.body.skill || "",
+      photo: req.body.photo || "",
     };
 
-    if (req.body.password && req.body.password.trim()) {
+    if (req.body.password && req.body.password.trim() !== "") {
       updates.password = req.body.password;
     }
 
     const updatedUser = await User.findOneAndUpdate(
-      { email: req.params.email },
+      {
+        email: req.params.email,
+      },
       updates,
       {
         new: true,
-        runValidators: true
+        runValidators: true,
       }
     );
 
     if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
     res.json({
-      message: "Profile updated",
-      user: updatedUser
+      message: "Profile updated successfully",
+      user: updatedUser,
     });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "Could not update profile" });
+
+    res.status(500).json({
+      message: "Could not update profile",
+    });
   }
 });
 
+// ===========================
+// All Users
+// ===========================
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await User.find({}, { password: 0 }).sort({
+      name: 1,
+    });
+
+    res.json(users);
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      message: "Could not fetch users",
+    });
+  }
+});
+
+// ===========================
+// Other Routes
+// ===========================
 const postRoutes = require("./postRoute");
 const skillRoutes = require("./skillRoutes");
 const connectionRoutes = require("./connectionRoutes");
@@ -136,20 +219,11 @@ app.use("/api/materials", materialRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/group-messages", groupMessageRoutes);
 
-app.get("/api/users", async (req, res) => {
-  try {
-    const users = await User.find({}, {
-      password: 0
-    }).sort({ name: 1 });
+// ===========================
+// Start Server
+// ===========================
+const PORT = 5000;
 
-    res.json(users);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Could not fetch users" });
-  }
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
-
-
-
-
-app.listen(5000, () => console.log("server running on 5000"));

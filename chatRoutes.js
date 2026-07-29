@@ -2,17 +2,43 @@ const express = require("express");
 const router = express.Router();
 const Message = require("./message");
 
+// =======================
 // SEND MESSAGE
+// =======================
 router.post("/", async (req, res) => {
-  const msg = new Message(req.body);
-  await msg.save();
-  res.json(msg);
+  try {
+    const { sender, receiver, text } = req.body;
+
+    if (!sender || !receiver || !text) {
+      return res.status(400).json({
+        message: "Sender, receiver and message are required",
+      });
+    }
+
+    const msg = new Message({
+      sender: sender.toLowerCase(),
+      receiver: receiver.toLowerCase(),
+      text,
+    });
+
+    await msg.save();
+
+    res.status(201).json(msg);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: "Could not send message",
+    });
+  }
 });
 
-// GET INBOX FOR USER
+// =======================
+// GET INBOX
+// =======================
 router.get("/inbox/:email", async (req, res) => {
   try {
-    const email = req.params.email;
+    const email = req.params.email.toLowerCase();
+
     const messages = await Message.find({
       $or: [
         { sender: email },
@@ -20,40 +46,67 @@ router.get("/inbox/:email", async (req, res) => {
       ]
     }).sort({ createdAt: -1 });
 
-    const latestByUser = new Map();
+    const latestConversations = {};
 
-    messages.forEach((message) => {
-      const otherUser = message.sender === email ? message.receiver : message.sender;
+    messages.forEach((msg) => {
+      const otherUser =
+        msg.sender === email
+          ? msg.receiver
+          : msg.sender;
 
-      if (!latestByUser.has(otherUser)) {
-        latestByUser.set(otherUser, {
+      if (!latestConversations[otherUser]) {
+        latestConversations[otherUser] = {
           otherUser,
-          text: message.text,
-          createdAt: message.createdAt,
-          sender: message.sender,
-          receiver: message.receiver,
-          isIncoming: message.receiver === email
-        });
+          text: msg.text,
+          sender: msg.sender,
+          receiver: msg.receiver,
+          createdAt: msg.createdAt,
+          isIncoming: msg.receiver === email,
+        };
       }
     });
 
-    res.json(Array.from(latestByUser.values()));
+    res.json(Object.values(latestConversations));
+
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "Could not fetch inbox" });
+    res.status(500).json({
+      message: "Could not fetch inbox",
+    });
   }
 });
 
-// GET CHAT
+// =======================
+// GET CHAT BETWEEN 2 USERS
+// =======================
 router.get("/:user1/:user2", async (req, res) => {
-  const msgs = await Message.find({
-    $or: [
-      { sender: req.params.user1, receiver: req.params.user2 },
-      { sender: req.params.user2, receiver: req.params.user1 }
-    ]
-  }).sort({ createdAt: 1 });
+  try {
+    const user1 = req.params.user1.toLowerCase();
+    const user2 = req.params.user2.toLowerCase();
 
-  res.json(msgs);
+    const messages = await Message.find({
+      $or: [
+        {
+          sender: user1,
+          receiver: user2,
+        },
+        {
+          sender: user2,
+          receiver: user1,
+        },
+      ],
+    }).sort({
+      createdAt: 1,
+    });
+
+    res.json(messages);
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: "Could not fetch chat",
+    });
+  }
 });
 
 module.exports = router;
